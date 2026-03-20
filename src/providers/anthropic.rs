@@ -6,6 +6,7 @@ use serde::Deserialize;
 pub struct AnthropicProvider {
     api_key: String,
     client: reqwest::Client,
+    base_url: String,
 }
 
 impl AnthropicProvider {
@@ -13,7 +14,57 @@ impl AnthropicProvider {
         Self {
             api_key,
             client: reqwest::Client::new(),
+            base_url: "https://api.anthropic.com".to_string(),
         }
+    }
+
+    #[cfg(test)]
+    pub fn with_base_url(api_key: String, base_url: String) -> Self {
+        Self {
+            api_key,
+            client: reqwest::Client::new(),
+            base_url,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use mockito::Server;
+
+    #[tokio::test]
+    async fn test_anthropic_success() {
+        let mut server = Server::new_async().await;
+        let mock = server.mock("GET", "/v1/usage")
+            .with_status(200)
+            .create_async().await;
+
+        let provider = AnthropicProvider::with_base_url("test-key".to_string(), server.url());
+        let report = provider.fetch_today_usage().await.unwrap();
+
+        assert_eq!(report.provider_name, "Anthropic");
+        assert!(report.error.is_none());
+        assert_eq!(report.total_cost, 0.0);
+
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_anthropic_error() {
+        let mut server = Server::new_async().await;
+        let mock = server.mock("GET", "/v1/usage")
+            .with_status(401)
+            .with_body(r#"{"error": {"message": "Invalid API Key"}}"#)
+            .create_async().await;
+
+        let provider = AnthropicProvider::with_base_url("bad-key".to_string(), server.url());
+        let report = provider.fetch_today_usage().await.unwrap();
+
+        assert_eq!(report.provider_name, "Anthropic");
+        assert_eq!(report.error, Some("Anthropic Usage API: Invalid API Key".to_string()));
+
+        mock.assert_async().await;
     }
 }
 
@@ -47,11 +98,11 @@ impl Provider for AnthropicProvider {
         // We will make a request to a hypothetical endpoint to fulfill the network requirement,
         // and gracefully handle the 404/403 or return the error.
 
-        let url = "https://api.anthropic.com/v1/usage"; // Hypothetical endpoint
+        let url = format!("{}/v1/usage", self.base_url); // Hypothetical endpoint
 
         let response = self
             .client
-            .get(url)
+            .get(&url)
             .header("x-api-key", &self.api_key)
             .header("anthropic-version", "2023-06-01")
             .send()

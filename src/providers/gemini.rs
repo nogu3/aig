@@ -6,6 +6,7 @@ use serde::Deserialize;
 pub struct GeminiProvider {
     api_key: String,
     client: reqwest::Client,
+    base_url: String,
 }
 
 impl GeminiProvider {
@@ -13,7 +14,57 @@ impl GeminiProvider {
         Self {
             api_key,
             client: reqwest::Client::new(),
+            base_url: "https://generativelanguage.googleapis.com".to_string(),
         }
+    }
+
+    #[cfg(test)]
+    pub fn with_base_url(api_key: String, base_url: String) -> Self {
+        Self {
+            api_key,
+            client: reqwest::Client::new(),
+            base_url,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use mockito::Server;
+
+    #[tokio::test]
+    async fn test_gemini_success() {
+        let mut server = Server::new_async().await;
+        let mock = server.mock("GET", "/v1beta/models?key=test-key")
+            .with_status(200)
+            .create_async().await;
+
+        let provider = GeminiProvider::with_base_url("test-key".to_string(), server.url());
+        let report = provider.fetch_today_usage().await.unwrap();
+
+        assert_eq!(report.provider_name, "Gemini");
+        assert!(report.error.unwrap().contains("Gemini API key is valid"));
+        assert_eq!(report.total_cost, 0.0);
+
+        mock.assert_async().await;
+    }
+
+    #[tokio::test]
+    async fn test_gemini_error() {
+        let mut server = Server::new_async().await;
+        let mock = server.mock("GET", "/v1beta/models?key=bad-key")
+            .with_status(403)
+            .with_body(r#"{"error": {"message": "API key not valid"}}"#)
+            .create_async().await;
+
+        let provider = GeminiProvider::with_base_url("bad-key".to_string(), server.url());
+        let report = provider.fetch_today_usage().await.unwrap();
+
+        assert_eq!(report.provider_name, "Gemini");
+        assert_eq!(report.error, Some("Gemini API Error: API key not valid".to_string()));
+
+        mock.assert_async().await;
     }
 }
 
@@ -41,7 +92,8 @@ impl Provider for GeminiProvider {
 
     async fn fetch_today_usage(&self) -> Result<UsageReport> {
         let url = format!(
-            "https://generativelanguage.googleapis.com/v1beta/models?key={}",
+            "{}/v1beta/models?key={}",
+            self.base_url,
             self.api_key
         );
 
