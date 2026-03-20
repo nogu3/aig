@@ -1,5 +1,5 @@
 # Builder stage
-FROM rust:1.80-bullseye AS builder
+FROM public.ecr.aws/docker/library/rust:latest AS builder
 
 WORKDIR /usr/src/app
 
@@ -23,7 +23,7 @@ RUN touch src/main.rs src/lib.rs \
     && cargo build --release
 
 # Runtime stage
-FROM debian:bullseye-slim
+FROM public.ecr.aws/docker/library/debian:bullseye-slim
 
 # Install CA certificates to enable HTTPS requests (reqwest needs this)
 RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*
