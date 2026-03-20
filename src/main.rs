@@ -1,15 +1,11 @@
-pub mod cli;
-pub mod config;
-pub mod providers;
-
-use clap::Parser;
-use cli::{Cli, Commands};
-use config::Config;
-use futures::future::join_all;
-use providers::{
+use aig::cli::{Cli, Commands};
+use aig::config::Config;
+use aig::providers::{
     anthropic::AnthropicProvider, gemini::GeminiProvider, openai::OpenAIProvider, Provider,
     UsageReport,
 };
+use clap::Parser;
+use futures::future::join_all;
 use std::sync::Arc;
 
 #[tokio::main]

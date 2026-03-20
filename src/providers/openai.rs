@@ -20,56 +20,12 @@ impl OpenAIProvider {
         }
     }
 
-    #[cfg(test)]
     pub fn with_base_url(api_key: String, base_url: String) -> Self {
         Self {
             api_key,
             client: reqwest::Client::new(),
             base_url,
         }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use mockito::Server;
-
-    #[tokio::test]
-    async fn test_openai_success() {
-        let mut server = Server::new_async().await;
-
-        let mock = server.mock("GET", mockito::Matcher::Regex(r"^/v1/dashboard/billing/usage\?start_date=.*&end_date=.*$".to_string()))
-            .with_status(200)
-            .with_body(r#"{"total_usage": 150.0}"#)
-            .create_async().await;
-
-        let provider = OpenAIProvider::with_base_url("test-key".to_string(), server.url());
-        let report = provider.fetch_today_usage().await.unwrap();
-
-        assert_eq!(report.provider_name, "OpenAI");
-        assert!(report.error.is_none());
-        assert_eq!(report.total_cost, 1.50); // 150 cents = $1.50
-
-        mock.assert_async().await;
-    }
-
-    #[tokio::test]
-    async fn test_openai_error() {
-        let mut server = Server::new_async().await;
-
-        let mock = server.mock("GET", mockito::Matcher::Regex(r"^/v1/dashboard/billing/usage\?start_date=.*&end_date=.*$".to_string()))
-            .with_status(401)
-            .with_body(r#"{"error": {"message": "Invalid authentication"}}"#)
-            .create_async().await;
-
-        let provider = OpenAIProvider::with_base_url("bad-key".to_string(), server.url());
-        let report = provider.fetch_today_usage().await.unwrap();
-
-        assert_eq!(report.provider_name, "OpenAI");
-        assert_eq!(report.error, Some("OpenAI Usage API Error: Invalid authentication".to_string()));
-
-        mock.assert_async().await;
     }
 }
 
