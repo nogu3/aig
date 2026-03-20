@@ -1,5 +1,5 @@
-# Development stage (default) - includes toolchain for build/test/lint
-FROM rust:latest AS dev
+# Builder stage
+FROM rust:latest AS builder
 
 WORKDIR /usr/src/app
 
@@ -7,27 +7,23 @@ WORKDIR /usr/src/app
 RUN cargo init --vcs none .
 COPY Cargo.toml Cargo.lock ./
 
-# Fetch and build dependencies (debug + dev-dependencies for testing)
+# Fetch and build dependencies
+# We touch src/main.rs and src/lib.rs to ensure Cargo sees them
 RUN mkdir -p src \
     && echo "fn main() {}" > src/main.rs \
     && echo "" > src/lib.rs \
-    && cargo test --no-run 2>/dev/null || true \
+    && cargo build --release \
     && rm -rf src
 
-# Copy the actual source code and tests
+# Copy the actual source code
 COPY src ./src
-COPY tests ./tests
-
+# Build the actual application
+# We need to touch the main and lib files so cargo knows they changed
 RUN touch src/main.rs src/lib.rs \
-    && cargo build
-
-# Builder stage - optimized release build
-FROM dev AS builder
-
-RUN cargo build --release
+    && cargo build --release
 
 # Runtime stage
-FROM debian:bookworm-slim AS runtime
+FROM debian:bookworm-slim
 
 # Install CA certificates to enable HTTPS requests (reqwest needs this)
 RUN apt-get update && apt-get install -y ca-certificates && rm -rf /var/lib/apt/lists/*

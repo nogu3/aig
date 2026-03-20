@@ -8,9 +8,10 @@ use mockito::Server;
 #[tokio::test]
 async fn test_anthropic_success() {
     let mut server = Server::new_async().await;
+    // Auth is valid, so it returns 400 Bad Request because messages is empty
     let mock = server
-        .mock("GET", "/v1/usage")
-        .with_status(200)
+        .mock("POST", "/v1/messages")
+        .with_status(400)
         .create_async()
         .await;
 
@@ -18,7 +19,7 @@ async fn test_anthropic_success() {
     let report = provider.fetch_today_usage().await.unwrap();
 
     assert_eq!(report.provider_name, "Anthropic");
-    assert!(report.error.is_none());
+    assert!(report.error.unwrap().contains("Usage/Cost API is not publicly available"));
     assert_eq!(report.total_cost, 0.0);
 
     mock.assert_async().await;
@@ -28,7 +29,7 @@ async fn test_anthropic_success() {
 async fn test_anthropic_error() {
     let mut server = Server::new_async().await;
     let mock = server
-        .mock("GET", "/v1/usage")
+        .mock("POST", "/v1/messages")
         .with_status(401)
         .with_body(r#"{"error": {"message": "Invalid API Key"}}"#)
         .create_async()
@@ -40,7 +41,7 @@ async fn test_anthropic_error() {
     assert_eq!(report.provider_name, "Anthropic");
     assert_eq!(
         report.error,
-        Some("Anthropic Usage API: Invalid API Key".to_string())
+        Some("Anthropic API Error: Invalid API Key".to_string())
     );
 
     mock.assert_async().await;

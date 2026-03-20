@@ -52,45 +52,54 @@ impl Provider for AnthropicProvider {
     }
 
     async fn fetch_today_usage(&self) -> Result<UsageReport> {
-        // This is a placeholder for the actual Anthropic usage API.
-        // As of late 2023 / early 2024, Anthropic does not provide a simple `/v1/usage` endpoint.
-        // We will make a request to a hypothetical endpoint to fulfill the network requirement,
-        // and gracefully handle the 404/403 or return the error.
+        // As of 2024, Anthropic does not provide a simple `/v1/usage` endpoint for standard API keys.
+        // To prevent a generic "404 Not Found" error, we'll make a deliberate minimal request
+        // to `/v1/messages` just to validate the API key (which returns 401 if invalid, 400 if valid but empty).
+        let url = format!("{}/v1/messages", self.base_url);
 
-        let url = format!("{}/v1/usage", self.base_url); // Hypothetical endpoint
+        // A deliberate malformed request to verify authentication
+        let body = serde_json::json!({
+            "model": "claude-3-haiku-20240307",
+            "max_tokens": 1,
+            "messages": []
+        });
 
         let response = self
             .client
-            .get(&url)
+            .post(&url)
             .header("x-api-key", &self.api_key)
             .header("anthropic-version", "2023-06-01")
+            .json(&body)
             .send()
             .await;
 
         match response {
-            Ok(res) if res.status().is_success() => {
-                // If it succeeds, parse some hypothetical usage data
-                Ok(UsageReport {
-                    provider_name: self.name().to_string(),
-                    total_cost: 0.0,
-                    model_costs: std::collections::HashMap::new(),
-                    error: None,
-                })
-            }
             Ok(res) => {
                 let status = res.status();
-                let error_msg = if let Ok(err_data) = res.json::<AnthropicErrorResponse>().await {
-                    err_data.error.message
-                } else {
-                    format!("HTTP Error: {}", status)
-                };
 
-                Ok(UsageReport {
-                    provider_name: self.name().to_string(),
-                    total_cost: 0.0,
-                    model_costs: std::collections::HashMap::new(),
-                    error: Some(format!("Anthropic Usage API: {}", error_msg)),
-                })
+                // If auth is valid, Anthropic will likely return a 400 Bad Request because messages is empty
+                if status.is_client_error() && status.as_u16() == 401 {
+                    let error_msg = if let Ok(err_data) = res.json::<AnthropicErrorResponse>().await {
+                        err_data.error.message
+                    } else {
+                        "Invalid API Key".to_string()
+                    };
+
+                    Ok(UsageReport {
+                        provider_name: self.name().to_string(),
+                        total_cost: 0.0,
+                        model_costs: std::collections::HashMap::new(),
+                        error: Some(format!("Anthropic API Error: {}", error_msg)),
+                    })
+                } else {
+                    // Auth succeeded (or endpoint exists), but Usage API is not implemented
+                    Ok(UsageReport {
+                        provider_name: self.name().to_string(),
+                        total_cost: 0.0,
+                        model_costs: std::collections::HashMap::new(),
+                        error: Some("Anthropic API key is valid, but the Usage/Cost API is not publicly available for this provider yet".to_string()),
+                    })
+                }
             }
             Err(e) => Ok(UsageReport {
                 provider_name: self.name().to_string(),

@@ -1,8 +1,5 @@
 services:
   aig:
-    build:
-      context: .
-      target: dev
+    build: .
     tty: true
-    working_dir: /usr/src/app
-    entrypoint: []
+    entrypoint: ["/bin/bash"]
