@@ -2,3 +2,5 @@ version: "3.9"
 services:
   aig:
     build: .
+    tty: true
+    entrypoint: ["/bin/bash"]
