@@ -30,8 +30,8 @@ impl GeminiProvider {
 // Google Gemini API doesn't have a standardized, publicly documented /usage endpoint
 // similar to OpenAI for general consumption.
 // They offer Google AI Studio which is free for reasonable use, and GCP Vertex AI.
-// For the sake of this tool, we will make a network request to the closest matching endpoint
-// and handle the failure gracefully or return the error.
+// For the sake of this tool, we will make a network request to generateContent
+// and extract the token count from the usageMetadata in the response.
 
 #[derive(Deserialize, Debug)]
 struct GeminiErrorResponse {
@@ -43,6 +43,18 @@ struct GeminiErrorDetail {
     message: String,
 }
 
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct GeminiGenerateContentResponse {
+    usage_metadata: Option<GeminiUsageMetadata>,
+}
+
+#[derive(Deserialize, Debug)]
+#[serde(rename_all = "camelCase")]
+struct GeminiUsageMetadata {
+    total_token_count: i64,
+}
+
 #[async_trait]
 impl Provider for GeminiProvider {
     fn name(&self) -> &'static str {
@@ -50,18 +62,36 @@ impl Provider for GeminiProvider {
     }
 
     async fn fetch_today_usage(&self) -> Result<UsageReport> {
-        let url = format!("{}/v1beta/models?key={}", self.base_url, self.api_key);
+        let url = format!(
+            "{}/v1beta/models/gemini-2.0-flash:generateContent?key={}",
+            self.base_url, self.api_key
+        );
 
-        let response = self.client.get(&url).send().await;
+        let body = serde_json::json!({
+            "contents": [{
+                "parts": [{"text": "hi"}]
+            }]
+        });
+
+        let response = self.client.post(&url).json(&body).send().await;
 
         match response {
             Ok(res) if res.status().is_success() => {
-                // If it succeeds, verify the API key is working, but Gemini lacks usage API.
+                let mut model_costs = std::collections::HashMap::new();
+                if let Ok(data) = res.json::<GeminiGenerateContentResponse>().await {
+                    if let Some(usage) = data.usage_metadata {
+                        model_costs.insert(
+                            "gemini-2.0-flash".to_string(),
+                            usage.total_token_count as f64,
+                        );
+                    }
+                }
+
                 Ok(UsageReport {
                     provider_name: self.name().to_string(),
                     total_cost: 0.0,
-                    model_costs: std::collections::HashMap::new(),
-                    error: Some("Gemini API key is valid, but the Usage/Cost API is not implemented for this provider yet".to_string()),
+                    model_costs,
+                    error: None,
                 })
             }
             Ok(res) => {
