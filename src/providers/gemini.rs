@@ -63,7 +63,7 @@ impl Provider for GeminiProvider {
 
     async fn fetch_today_usage(&self) -> Result<UsageReport> {
         let url = format!(
-            "{}/v1beta/models/gemini-2.0-flash:generateContent?key={}",
+            "{}/v1beta/models/gemini-2.5-flash:generateContent?key={}",
             self.base_url, self.api_key
         );
 
@@ -81,7 +81,7 @@ impl Provider for GeminiProvider {
                 if let Ok(data) = res.json::<GeminiGenerateContentResponse>().await {
                     if let Some(usage) = data.usage_metadata {
                         model_costs.insert(
-                            "gemini-2.0-flash".to_string(),
+                            "gemini-2.5-flash".to_string(),
                             usage.total_token_count as f64,
                         );
                     }

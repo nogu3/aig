@@ -56,7 +56,7 @@ async fn test_anthropic_error() {
 async fn test_gemini_success() {
     let mut server = Server::new_async().await;
     let mock = server
-        .mock("POST", "/v1beta/models/gemini-2.0-flash:generateContent?key=test-key")
+        .mock("POST", "/v1beta/models/gemini-2.5-flash:generateContent?key=test-key")
         .with_status(200)
         .with_body(
             r#"{
@@ -77,7 +77,7 @@ async fn test_gemini_success() {
     assert!(report.error.is_none());
     assert_eq!(report.total_cost, 0.0);
     assert_eq!(
-        report.model_costs.get("gemini-2.0-flash"),
+        report.model_costs.get("gemini-2.5-flash"),
         Some(&10.0)
     );
 
@@ -88,7 +88,7 @@ async fn test_gemini_success() {
 async fn test_gemini_error() {
     let mut server = Server::new_async().await;
     let mock = server
-        .mock("POST", "/v1beta/models/gemini-2.0-flash:generateContent?key=bad-key")
+        .mock("POST", "/v1beta/models/gemini-2.5-flash:generateContent?key=bad-key")
         .with_status(403)
         .with_body(r#"{"error": {"message": "API key not valid"}}"#)
         .create_async()
