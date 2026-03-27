@@ -1,0 +1,5 @@
+services:
+  aig:
+    build: .
+    tty: true
+    entrypoint: ["/bin/bash"]
