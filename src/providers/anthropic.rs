@@ -79,7 +79,8 @@ impl Provider for AnthropicProvider {
 
                 // If auth is valid, Anthropic will likely return a 400 Bad Request because messages is empty
                 if status.is_client_error() && status.as_u16() == 401 {
-                    let error_msg = if let Ok(err_data) = res.json::<AnthropicErrorResponse>().await {
+                    let error_msg = if let Ok(err_data) = res.json::<AnthropicErrorResponse>().await
+                    {
                         err_data.error.message
                     } else {
                         "Invalid API Key".to_string()

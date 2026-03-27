@@ -19,7 +19,10 @@ async fn test_anthropic_success() {
     let report = provider.fetch_today_usage().await.unwrap();
 
     assert_eq!(report.provider_name, "Anthropic");
-    assert!(report.error.unwrap().contains("Usage/Cost API is not publicly available"));
+    assert!(report
+        .error
+        .unwrap()
+        .contains("Usage/Cost API is not publicly available"));
     assert_eq!(report.total_cost, 0.0);
 
     mock.assert_async().await;

@@ -50,11 +50,7 @@ impl Provider for GeminiProvider {
     }
 
     async fn fetch_today_usage(&self) -> Result<UsageReport> {
-        let url = format!(
-            "{}/v1beta/models?key={}",
-            self.base_url,
-            self.api_key
-        );
+        let url = format!("{}/v1beta/models?key={}", self.base_url, self.api_key);
 
         let response = self.client.get(&url).send().await;
 
